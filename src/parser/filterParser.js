@@ -16,6 +16,7 @@
 //   http://host/service/Products?$filter=Price lt 10.00
 //   http://host/service/Categories?$filter=Products/$count lt 10
 
+import _ from 'lodash';
 import functions from './functionsParser';
 import { split } from '../utils';
 
@@ -33,7 +34,7 @@ const stringHelper = {
       return str.substr(0, str.length - key.length);
     }
     return str;
-  },
+  }
 };
 
 const validator = {
@@ -55,6 +56,72 @@ const validator = {
     return ({ val });
   }
 };
+
+function parseFilterCondition(condition, resolve, reject) {
+  // parse "indexof(title,'X1ML') gt 0"
+    const conditionArr = split(condition, OPERATORS_KEYS);
+    if (conditionArr.length === 0) {
+      // parse "contains(title,'X1ML')"
+      console.log('========unreachable????==========');
+      conditionArr.push(condition);
+    }
+    if (conditionArr.length !== 3 && conditionArr.length !== 1) {
+      return reject(`Syntax error at '${condition}'.`);
+    }
+    const [key, odataOperator, value] = conditionArr;
+
+    let val = undefined;
+    if (value !== undefined) {
+      const result = validator.formatValue(value);
+      if (result.err) {
+        return reject(result.err);
+      }
+      val = result.val;
+    }
+    
+    return [key, odataOperator, val];
+}
+
+function populateAndCondition(findObj, key, odataOperator, val, resolve, reject) {
+  switch (odataOperator) {
+    case 'eq':
+      if(findObj[key] && findObj[key].$in){
+        return reject(`Syntax error, already have 'in' filter on '${key}'`);
+      } else {
+        _.set(findObj, key + '.$in', [val]);
+      }
+      break;
+    case 'gt':
+      if(findObj[key] && findObj[key].$gt){
+        return reject(`Syntax error, already have 'gt' filter on '${key}'`);
+      } else {
+        _.set(findObj, key + '.$gt', val);
+      }
+      break;
+    case 'lt':
+      if(findObj[key] && findObj[key].$lt){
+        return reject(`Syntax error, already have 'lt' filter on '${key}'`);
+      } else {
+        _.set(findObj, key + '.$lt', val);
+      }
+      break;
+    default:
+      return reject("Incorrect operator at '#{item}', may be not available currently.");
+  }
+}
+
+function populateOrCondition(findObj, key, odataOperator, val, resolve, reject) {
+  switch (odataOperator) {
+    case 'eq':
+      if(!findObj[key] || !findObj[key].$in){
+        _.set(findObj, key + '.$in', []);
+      }
+      findObj[key].$in.push(val);
+      break;
+    default:
+      return reject("Incorrect operator at '#{item}', may be not available currently.");
+  }
+}
 
 export default (query, $filter) => new Promise((resolve, reject) => {
   if (!$filter) {
@@ -86,6 +153,19 @@ export default (query, $filter) => new Promise((resolve, reject) => {
   }
   console.log('and array:', andArray);
   console.log('or array:', orArray);
+  let findObj = {};
+  andArray.map((item) => {
+    const [key, odataOperator, val] = parseFilterCondition(item, resolve, reject);
+    //currently not support function (contains, indexof ...) in filter
+    populateAndCondition(findObj, key, odataOperator, val, resolve, reject);
+    console.log('and:', findObj);
+  });
+  orArray.map((item) => {
+    const [key, odataOperator, val] = parseFilterCondition(item, resolve, reject);
+    populateOrCondition(findObj, key, odataOperator, val, resolve, reject);
+    console.log('or:', findObj);
+  });
+  console.log('finished:', findObj);
   
   
   const condition = split($filter, ['and', 'or'])
