@@ -60,10 +60,37 @@ export default (query, $filter) => new Promise((resolve, reject) => {
   if (!$filter) {
     return resolve();
   }
-
+  
+  console.log('filter parsing...');
+  let conditions = split($filter, ['and', 'or']);
+  let andArray = [];
+  let orArray = [];
+  console.log('conditions:', conditions);
+  //have $filter
+  if (conditions.length !== 0) {
+    //get the first condition
+    andArray.push(conditions.shift());
+    //if got more conditions (and/or)
+    if(conditions.length !== 0){
+      for (let index = 0; index < conditions.length; index +=2) {
+        if (conditions[index] === 'and' && conditions[index + 1]) {
+          andArray.push(conditions[index + 1]);
+        } else if (conditions[index] === 'or'&& conditions[index + 1]) {
+          orArray.push(conditions[index + 1]);
+        } else {
+          console.log(`Syntax error at '${conditions[index]}'.`);
+          return reject(`Syntax error at '${conditions[index]}'.`);
+        }
+      }
+    }
+  }
+  console.log('and array:', andArray);
+  console.log('or array:', orArray);
+  
+  
   const condition = split($filter, ['and', 'or'])
-    .filter((item) => (item !== 'and' && item !== 'or'));
-
+    .filter((item) => (item !== 'and' && item !== 'or')); 
+  
   condition.map((item) => {
     // parse "indexof(title,'X1ML') gt 0"
     const conditionArr = split(item, OPERATORS_KEYS);
