@@ -57,7 +57,7 @@ const validator = {
   }
 };
 
-function parseFilterCondition(condition, resolve, reject) {
+function parseFilterCondition(condition) {
   // parse "indexof(title,'X1ML') gt 0"
     const conditionArr = split(condition, OPERATORS_KEYS);
     if (conditionArr.length === 0) {
@@ -66,7 +66,9 @@ function parseFilterCondition(condition, resolve, reject) {
       conditionArr.push(condition);
     }
     if (conditionArr.length !== 3 && conditionArr.length !== 1) {
-      return reject(`Syntax error at '${condition}'.`);
+      let err = `Syntax error at '${condition}'.`;
+      console.err(err);
+      throw err;
     }
     const [key, odataOperator, value] = conditionArr;
 
@@ -74,7 +76,8 @@ function parseFilterCondition(condition, resolve, reject) {
     if (value !== undefined) {
       const result = validator.formatValue(value);
       if (result.err) {
-        return reject(result.err);
+        console.err(result.err);
+        throw result.err;
       }
       val = result.val;
     }
@@ -82,35 +85,43 @@ function parseFilterCondition(condition, resolve, reject) {
     return [key, odataOperator, val];
 }
 
-function populateAndCondition(findObj, key, odataOperator, val, resolve, reject) {
+function populateAndCondition(findObj, key, odataOperator, val) {
   switch (odataOperator) {
     case 'eq':
       if(findObj[key] && findObj[key].$in){
-        return reject(`Syntax error, already have 'in' filter on '${key}'`);
+        let err = `Syntax error, already have 'in' filter on '${key}'`;
+        console.err(err);
+        throw err;
       } else {
         _.set(findObj, key + '.$in', [val]);
       }
       break;
     case 'gt':
       if(findObj[key] && findObj[key].$gt){
-        return reject(`Syntax error, already have 'gt' filter on '${key}'`);
+        let err = `Syntax error, already have 'gt' filter on '${key}'`;
+        console.err(err);
+        throw err;
       } else {
         _.set(findObj, key + '.$gt', val);
       }
       break;
     case 'lt':
       if(findObj[key] && findObj[key].$lt){
-        return reject(`Syntax error, already have 'lt' filter on '${key}'`);
+        let err = `Syntax error, already have 'lt' filter on '${key}'`;
+        console.err(err);
+        throw err;
       } else {
         _.set(findObj, key + '.$lt', val);
       }
       break;
     default:
-      return reject("Incorrect operator at '#{item}', may be not available currently.");
+      let err = `Incorrect operator at '${key}', may be not available currently.`;
+      console.err(err);
+      throw err;
   }
 }
 
-function populateOrCondition(findObj, key, odataOperator, val, resolve, reject) {
+function populateOrCondition(findObj, key, odataOperator, val) {
   switch (odataOperator) {
     case 'eq':
       if(!findObj[key] || !findObj[key].$in){
@@ -119,15 +130,16 @@ function populateOrCondition(findObj, key, odataOperator, val, resolve, reject) 
       findObj[key].$in.push(val);
       break;
     default:
-      return reject("Incorrect operator at '#{item}', may be not available currently.");
+      let err = `Incorrect operator at '${key}', may be not available currently.`;
+      console.err(err);
+      throw err;
   }
 }
 
-export default (query, $filter) => new Promise((resolve, reject) => {
+export default (model, $filter) => {
   if (!$filter) {
-    return resolve();
-  }
-  
+    return model.find();;
+  }  
   console.log('filter parsing...');
   let conditions = split($filter, ['and', 'or']);
   let andArray = [];
@@ -145,97 +157,28 @@ export default (query, $filter) => new Promise((resolve, reject) => {
         } else if (conditions[index] === 'or'&& conditions[index + 1]) {
           orArray.push(conditions[index + 1]);
         } else {
-          console.log(`Syntax error at '${conditions[index]}'.`);
-          return reject(`Syntax error at '${conditions[index]}'.`);
+          let err = `Syntax error at '${conditions[index]}'.`;
+          console.err(err);
+          throw err;
         }
       }
     }
   }
   console.log('and array:', andArray);
   console.log('or array:', orArray);
+  
   let findObj = {};
   andArray.map((item) => {
-    const [key, odataOperator, val] = parseFilterCondition(item, resolve, reject);
+    const [key, odataOperator, val] = parseFilterCondition(item);
     //currently not support function (contains, indexof ...) in filter
-    populateAndCondition(findObj, key, odataOperator, val, resolve, reject);
+    populateAndCondition(findObj, key, odataOperator, val);
     console.log('and:', findObj);
   });
   orArray.map((item) => {
-    const [key, odataOperator, val] = parseFilterCondition(item, resolve, reject);
-    populateOrCondition(findObj, key, odataOperator, val, resolve, reject);
+    const [key, odataOperator, val] = parseFilterCondition(item);
+    populateOrCondition(findObj, key, odataOperator, val);
     console.log('or:', findObj);
   });
   console.log('finished:', findObj);
-  
-  
-  const condition = split($filter, ['and', 'or'])
-    .filter((item) => (item !== 'and' && item !== 'or')); 
-  
-  condition.map((item) => {
-    // parse "indexof(title,'X1ML') gt 0"
-    const conditionArr = split(item, OPERATORS_KEYS);
-    if (conditionArr.length === 0) {
-      // parse "contains(title,'X1ML')"
-      conditionArr.push(item);
-    }
-    if (conditionArr.length !== 3 && conditionArr.length !== 1) {
-      return reject(`Syntax error at '${item}'.`);
-    }
-    const [key, odataOperator, value] = conditionArr;
-
-    let val = undefined;
-    if (value !== undefined) {
-      const result = validator.formatValue(value);
-      if (result.err) {
-        return reject(result.err);
-      }
-      val = result.val;
-    }
-
-    // function query
-    const functionKey = key.substring(0, key.indexOf('('));
-    if (['indexof', 'year', 'contains'].indexOf(functionKey) > -1) {
-      functions[functionKey](query, key, odataOperator, val);
-    } else {
-      if (conditionArr.length === 1) {
-        return reject(`Syntax error at '${item}'.`);
-      }
-      if (value === 'null') {
-        switch (odataOperator) {
-          case 'eq':
-            query.exists(key, false);
-            return resolve();
-          case 'ne':
-            query.exists(key, true);
-            return resolve();
-          default:
-            break;
-        }
-      }
-      // operator query
-      switch (odataOperator) {
-        case 'eq':
-          query.where(key).equals(val);
-          break;
-        case 'ne':
-          query.where(key).ne(val);
-          break;
-        case 'gt':
-          query.where(key).gt(val);
-          break;
-        case 'ge':
-          query.where(key).gte(val);
-          break;
-        case 'lt':
-          query.where(key).lt(val);
-          break;
-        case 'le':
-          query.where(key).lte(val);
-          break;
-        default:
-          return reject("Incorrect operator at '#{item}'.");
-      }
-    }
-  });
-  resolve();
-});
+  return model.find(findObj);
+}
