@@ -1,5 +1,5 @@
 function _updateEntity(resolve, reject, MongooseModel, req, entity) {
-  MongooseModel.findByIdAndUpdate(entity.id, req.body, (err) => {
+  MongooseModel.findOneAndUpdate({id: entity.id}, req.body, (err) => {
     if (err) {
       return reject(err);
     }
@@ -15,7 +15,7 @@ function _createEntity(resolve, reject, MongooseModel, req, entity) {
     return reject({ status: 400 }, { text: 'Id is invalid.' });
   }
   const newEntity = new MongooseModel(req.body);
-  newEntity._id = req.params.id;
+  newEntity.id = req.params.id;
   newEntity.save((err) => {
     if (err) {
       return reject(err);
@@ -25,7 +25,7 @@ function _createEntity(resolve, reject, MongooseModel, req, entity) {
 }
 
 export default (req, MongooseModel) => new Promise((resolve, reject) => {
-  MongooseModel.findOne({ _id: req.params.id }, (err, entity) => {
+  MongooseModel.findOne({ id: req.params.id }, (err, entity) => {
     if (err) {
       return reject(err);
     }

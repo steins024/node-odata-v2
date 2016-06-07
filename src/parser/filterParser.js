@@ -144,7 +144,6 @@ export default (model, $filter) => {
   let conditions = split($filter, ['and', 'or']);
   let andArray = [];
   let orArray = [];
-  console.log('conditions:', conditions);
   //have $filter
   if (conditions.length !== 0) {
     //get the first condition
@@ -164,21 +163,16 @@ export default (model, $filter) => {
       }
     }
   }
-  console.log('and array:', andArray);
-  console.log('or array:', orArray);
-  
+
   let findObj = {};
   andArray.map((item) => {
     const [key, odataOperator, val] = parseFilterCondition(item);
     //currently not support function (contains, indexof ...) in filter
     populateAndCondition(findObj, key, odataOperator, val);
-    console.log('and:', findObj);
   });
   orArray.map((item) => {
     const [key, odataOperator, val] = parseFilterCondition(item);
     populateOrCondition(findObj, key, odataOperator, val);
-    console.log('or:', findObj);
   });
-  console.log('finished:', findObj);
   return model.find(findObj);
 }

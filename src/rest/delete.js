@@ -1,5 +1,5 @@
 export default (req, MongooseModel) => new Promise((resolve, reject) => {
-  MongooseModel.remove({ _id: req.params.id }, (err, result) => {
+  MongooseModel.remove({ id: req.params.id }, (err, result) => {
     if (err) {
       return reject(err);
     }
