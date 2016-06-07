@@ -140,7 +140,6 @@ export default (model, $filter) => {
   if (!$filter) {
     return model.find();;
   }  
-  console.log('filter parsing...');
   let conditions = split($filter, ['and', 'or']);
   let andArray = [];
   let orArray = [];

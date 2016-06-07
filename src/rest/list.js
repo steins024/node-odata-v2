@@ -16,9 +16,7 @@ function _countQuery(model, { count, filter }) {
 }
 
 function _dataQuery(model, { filter, orderby, skip, top, select }, options) {
-  console.log('data query');
   return new Promise((resolve, reject) => {
-    console.log('new promise');
     let query = filterParser(model, filter);
     orderbyParser(query, orderby || options.orderby)
       .then(() => skipParser(query, skip, options.maxSkip))
